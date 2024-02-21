@@ -163,6 +163,10 @@ if(document.querySelector(".search-methods")) {
     });
 
     query.addEventListener("input", () => this.debounceLoadPosts());
+    
+    // document.querySelectorAll(".post__image").forEach(el => {
+    //     el.addEventListener("click", saveHistory());
+    // })
 
     // Get New Page 
 
@@ -233,6 +237,14 @@ if(document.querySelector(".search-methods")) {
     
     setMinMaxPriceRange();
     
+    function saveHistory() {
+        const searchQuery = query.value;
+        const filtersArray = getActiveFilters();
+        const select = getActiveSelects();
+        const price = getMinMaxPrice();
+    
+        window.history.replaceState({}, "", queryUrl(filtersArray, searchQuery, select, price, true));
+    }
 }
 
 // Lazy Loading
@@ -246,3 +258,9 @@ function setLazyLoading() {
     }); 
 }
 
+
+if (document.getElementById("art-page")) {
+    document.getElementById("go-back").addEventListener("click", () => {
+        history.back();
+    });
+}

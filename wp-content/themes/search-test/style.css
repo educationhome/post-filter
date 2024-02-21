@@ -104,3 +104,15 @@ svg{
     margin: 20px;
     display:inline-block;
 }
+
+button {
+    font-family: cursive;
+}
+
+label {
+    font-family: cursive;
+}
+
+h2 {
+    font-family: cursive;
+}

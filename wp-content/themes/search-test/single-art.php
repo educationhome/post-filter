@@ -19,7 +19,7 @@ $color = wp_get_post_terms($postId, 'artworks_color_filter', ['hide_empty' => tr
 <div id="art-page" data-template="art">
     
     <div class="back">
-        <a href="#" id="go-back">
+        <button id="go-back">
             <-- back
         </a>
     </div>

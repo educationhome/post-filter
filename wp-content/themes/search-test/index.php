@@ -40,9 +40,6 @@ if(empty($argsFilter["price_range"])) {
     $maxPriceInput = intval($maxPriceInput); 
 }
 
-// Min Max Price 
-
-
 // Get Filters
 
 $artFilters = get_terms([
@@ -127,7 +124,7 @@ $foundPosts = false;
     </div>
 
     <div class="filters">
-        <h2>Filters: </h2>
+        <h2>Colors: </h2>
         <?php foreach ($artFilters as $term) : ?>
             <?php 
                 $filterClass = "filters__item";
