@@ -1,0 +1,106 @@
+/**
+ * Theme Name: Search Test
+ * Description:  Search Test
+ * Author: Daniil Mikh
+ */
+
+h1 {
+    font-size: 40px;
+    font-family: cursive;
+}
+
+
+#main {
+    margin: 50px;
+}
+
+.filters {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.sizes {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-methods {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+.posts {
+    position: relative;
+    margin-top: 70px;
+}
+
+
+/* Input Range */
+
+
+input[type=range] {
+    box-sizing: border-box;
+    appearance: none;
+    width: 300px;
+    margin: 0;
+    padding: 0 2px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 1px;
+    outline: none;
+    background: linear-gradient(grey, grey) no-repeat center;
+    background-size: 100% 2px;
+    pointer-events: none;
+ 
+    &:active,
+    &:focus {
+       outline: none;
+    }
+ 
+    &::-webkit-slider-thumb {
+       height: 15px;
+       width: 15px;
+       border-radius: 28px;
+       background-color: black;
+       position: relative;
+       margin: 5px 0;
+       cursor: pointer;
+       appearance: none;
+       pointer-events: all;
+       box-shadow: 0 1px 4px 0.5px rgba(0, 0, 0, 0.25);
+    }
+ }
+ 
+ .multi-range {
+    position: relative;
+    height: 20px;
+ 
+    input[type=range] {
+       position: absolute;
+       
+       &:nth-child(1) {
+          &::-webkit-slider-thumb::before {
+             background-color: black;
+          }
+       }
+ 
+       &:nth-child(2) {
+          background: none;
+ 
+          &::-webkit-slider-thumb::before {
+              background-color: grey; 
+          }
+       }
+    }
+ }
+
+svg{
+    width: 100px;
+    height: 100px;
+    margin: 20px;
+    display:inline-block;
+}
