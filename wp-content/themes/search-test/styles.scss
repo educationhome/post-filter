@@ -4,7 +4,7 @@
 
     transition: background 0.3s linear;
 
-    &.--is-active {
+    &.-is-active {
         background-color: rgb(70, 70, 70);
         color: white;
     }
@@ -43,7 +43,7 @@
 
     transition: background 0.3s linear;
 
-    &.--is-active {
+    &.-is-active {
         background-color: rgb(70, 70, 70);
         color: white;
     }
@@ -74,11 +74,13 @@ h2 {
 }
 
 .posts__gallery {
-    column-count: 3;
-    --webkit-column-count: 3;
-    --moz-column-count: 3;
-    gap: 1rem;
-    padding: 2rem 0 0 0;
+    display: flex;
+    width: 100%;
+}
+
+.posts__container {
+    flex: 1;
+    margin-right: 20px;
 }
 
 .post__image img {
