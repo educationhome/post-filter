@@ -1,0 +1,51 @@
+<section class="posts__gallery">
+            <?php 
+            // while ($queryPosts->have_posts()): $queryPosts->the_post();
+            //     $postId = get_the_ID();
+            //     $title = get_the_title($postId);
+            //     $image = get_field("art_image", $postId);
+            //     $size = get_field("art_size", $postId);
+            //     $price = intval(get_field("art_price", $postId));
+                    
+            //     $matchingPosts[] = array(
+            //         "postId" => $postId,
+            //         "title" => $title,
+            //         "image" => $image,
+            //         "size" => $size,
+            //         "price" => $price,
+            //     );
+            // endwhile;
+
+            if (empty($matchingPosts)): ?>
+                <div class="no-posts">
+                    <p class="no-posts__paragraph">No posts founded </p>
+                </div>
+            <?php else:
+                for ($i = 1; $i <= GALLERY_COLUMN_COUNT; $i++) {
+                    ${"container" . $i} = array();
+                }
+    
+                $i = 1;
+                foreach( $matchingPosts as $post ) {
+                    array_push(${"container" . $i}, $post);
+                    $i++;
+        
+                    if ($i > GALLERY_COLUMN_COUNT) {
+                        $i = 1;
+                    }
+                }
+    
+                for ($containerNum = 1; $containerNum <= GALLERY_COLUMN_COUNT; $containerNum++): ?>
+                    <div class="posts__container">
+                        <?php 
+                        foreach (${"container" . $containerNum} as $post): ?>
+                            <a class="post__image" href="<?php echo home_url() . "/art/" . get_post_field("post_name", $post["postId"]); ?>">
+                                <img data-src="<?php echo $post["image"]["url"]; ?>" alt="<?php echo $post["image"]["title"]; ?>" class="lazy">
+                                <h3><?php echo $post["title"]; ?></h3>
+                                <p>US$<?php echo $post["price"]; ?></p>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endfor; 
+            endif;   ?>
+    </section>

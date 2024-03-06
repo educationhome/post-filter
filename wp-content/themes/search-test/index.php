@@ -20,7 +20,6 @@ $argsFilter["max_price"] = intval($argsFilter["max_price"]);
 $artSizes = getArtSizes();
 $highestArtPrice = getHighestArtPrice();
 
-
 $page = $argsFilter["art_page"] ?? 1;
 $posts_per_page = $page * 5;
 
@@ -40,6 +39,36 @@ if (!empty($argsFilter["filters"])) {
     ];
 }
 
+if (!empty($argsFilter["sizes"])) {
+    $argsPosts["meta_query"] = [
+        [
+            "key" => "art_size",
+            "value" => $argsFilter["sizes"], 
+            "compare" => "IN",
+        ],
+    ];
+}
+
+if (isset($argsFilter["min_price"]) && isset($argsFilter["max_price"])) {
+    $argsPosts["meta_query"] = array(
+        'relation' => 'AND',
+        array(
+            'key' => 'art_price',
+            'value' => $argsFilter["min_price"],
+            'compare' => '>=',
+            'type' => 'NUMERIC',
+        ),
+        array(
+            'key' => 'art_price',
+            'value' => $argsFilter["max_price"],
+            'compare' => '<=',
+            'type' => 'NUMERIC',
+        ),
+    );
+}
+
+// index % COLUMS_COUNT
+
 $queryPosts = new WP_Query($argsPosts);
 
 ?>
@@ -58,7 +87,7 @@ $queryPosts = new WP_Query($argsPosts);
             name="query" 
             id="query" 
             placeholder="Search by Art Title" 
-            value="<?php echo !empty($argsFilter["query"]) ? $argsFilter['query'] : ""; ?>"
+            value="<?php echo !empty($argsFilter["query"]) ? $argsFilter["query"] : ""; ?>"
             >
 
             <button type="submit">
@@ -80,7 +109,7 @@ $queryPosts = new WP_Query($argsPosts);
                         class="filters__checkbox" 
                         name="filters[]" 
                         value="<?php echo $term->slug; ?>" 
-                        <?php if ($isChecked) echo 'checked'; ?>
+                        <?php if ($isChecked) echo "checked"; ?>
                         >
                     <?php echo $term->name; ?>
                 </label>
@@ -101,7 +130,7 @@ $queryPosts = new WP_Query($argsPosts);
                         class="sizes__checkbox" 
                         name="sizes[]" 
                         value="<?php echo $term; ?>" 
-                        <?php if ($isChecked) echo 'checked'; ?>
+                        <?php if ($isChecked) echo "checked"; ?>
                         >
                     <?php echo $term; ?>
                 </label>
@@ -148,38 +177,20 @@ $queryPosts = new WP_Query($argsPosts);
 
 <div class="posts">
     <h1>Result</h1>
-    <section class="posts__gallery">
-    <?php 
-        $foundPosts = false;
-        $totalContainers = 3;
 
-        for ($containerNum = 1; $containerNum <= $totalContainers; $containerNum++): ?>
-            <div class="posts__container container__<?php echo $containerNum; ?>">
-                <?php 
-                while ($queryPosts->have_posts()): $queryPosts->the_post();
-                    $currentPost = $queryPosts->current_post + 1; 
-                    
-                    if ($currentPost % $totalContainers == $containerNum % $totalContainers):
-                        $postId = get_the_ID();
-                        $title = get_the_title($postId);
-                        $image = get_field("art_image", $postId);
-                        $size = get_field("art_size", $postId);
-                        $price = intval(get_field("art_price", $postId));
-                        
-                        if ((in_array($size, $argsFilter["sizes"]) || empty($argsFilter["sizes"])) && ($price >= $argsFilter["min_price"] && $price <= $argsFilter["max_price"]) || (empty($argsFilter["min_price"]) && empty($argsFilter["max_price"]))):
-                            $foundPosts = true; ?>
-                            <a class="post__image" href="<?php echo home_url() . "/art/" . get_post_field('post_name', $postId); ?>">
-                                <img data-src="<?php echo $image["url"]; ?>" alt="<?php echo $image["title"]; ?>" class="lazy">
-                                <h3><?php echo $title; ?></h3>
-                                <p>US$<?php echo $price; ?></p>
-                            </a>
-                        <?php endif; ?>
-                    <?php endif;
-                endwhile; ?>
-            </div>
-        <?php 
-        endfor;
-        ?>
+    <section class="posts__gallery">
+            <?php
+            while($queryPosts->have_posts()): $queryPosts->the_post(); 
+                for ($i = 0; $i < $queryPosts->found_posts; $i++) {
+                    for ($j = 0; $j < GALLERY_COLUMN_COUNT; $j++) {
+                        if ($i % GALLERY_COLUMN_COUNT == $j) {
+                            echo $i . "\n" . "\n";
+                        }
+                    }
+                }
+                // var_dump($queryPosts->posts[0]); // 0 is $
+            endwhile;
+            ?>
     </section>
 
 <?php 
