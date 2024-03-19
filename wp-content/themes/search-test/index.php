@@ -4,7 +4,7 @@ get_header();
 $pageId = get_the_ID();
 
 $argsFilter = parseArtQueryArgs();
-var_dump($argsFilter);
+
 // Get Filters
 
 $artFilters = get_terms([
@@ -21,13 +21,16 @@ $artSizes = getArtSizes();
 $highestArtPrice = getHighestArtPrice();
 
 $page = $argsFilter["art_page"] ?? 1;
-$posts_per_page = $page * 5;
+$posts_per_page = $page * POSTS_PER_PAGE;
 
 $argsPosts = [
     "post_type"      => "art",
-    "posts_per_page" => -1,
-    "s" => $argsFilter["query"],
+    "posts_per_page" => $posts_per_page,
 ];
+
+if (!empty($argsFilter["query"])) {
+    $argsPosts["s"] = $argsFilter["query"];
+}
 
 if (!empty($argsFilter["filters"])) {
     $argsPosts["tax_query"] = [
@@ -40,34 +43,30 @@ if (!empty($argsFilter["filters"])) {
 }
 
 if (!empty($argsFilter["sizes"])) {
-    $argsPosts["meta_query"] = [
-        [
-            "key" => "art_size",
-            "value" => $argsFilter["sizes"], 
-            "compare" => "IN",
-        ],
-    ];
-}
-
-if (isset($argsFilter["min_price"]) && isset($argsFilter["max_price"])) {
-    $argsPosts["meta_query"] = array(
-        'relation' => 'AND',
-        array(
-            'key' => 'art_price',
-            'value' => $argsFilter["min_price"],
-            'compare' => '>=',
-            'type' => 'NUMERIC',
-        ),
-        array(
-            'key' => 'art_price',
-            'value' => $argsFilter["max_price"],
-            'compare' => '<=',
-            'type' => 'NUMERIC',
-        ),
+    $argsPosts["meta_query"][] = array(
+        "key" => "art_size",
+        "value" => $argsFilter["sizes"],
+        "compare" => "IN",
     );
 }
 
-// index % COLUMS_COUNT
+if (isset($argsFilter["min_price"]) && isset($argsFilter["max_price"])) {
+    $argsPosts["meta_query"][] = array(
+        "relation" => "AND",
+        array(
+            "key" => "art_price",
+            "value" => $argsFilter["min_price"],
+            "compare" => ">=",
+            "type" => "NUMERIC",
+        ),
+        array(
+            "key" => "art_price",
+            "value" => $argsFilter["max_price"],
+            "compare" => "<=",
+            "type" => "NUMERIC",
+        ),
+    );
+}
 
 $queryPosts = new WP_Query($argsPosts);
 
@@ -181,17 +180,59 @@ $queryPosts = new WP_Query($argsPosts);
     <section class="posts__gallery">
             <?php
             while($queryPosts->have_posts()): $queryPosts->the_post(); 
-                for ($i = 0; $i < $queryPosts->found_posts; $i++) {
-                    for ($j = 0; $j < GALLERY_COLUMN_COUNT; $j++) {
-                        if ($i % GALLERY_COLUMN_COUNT == $j) {
-                            echo $i . "\n" . "\n";
-                        }
-                    }
-                }
-                // var_dump($queryPosts->posts[0]); // 0 is $
+                $postId = get_the_ID();
+                $title = get_the_title($postId);
+                $image = get_field("art_image", $postId);
+                $size = get_field("art_size", $postId);
+                $price = intval(get_field("art_price", $postId));
+                    
+                $matchingPosts[] = array(
+                    "postId" => $postId,
+                    "title" => $title,
+                    "image" => $image,
+                    "size" => $size,
+                    "price" => $price,
+                );
             endwhile;
-            ?>
+
+            $showMoreButton = true;
+            if (empty($matchingPosts)) {
+                $showMoreButton = false;
+            } else {
+                if (count($matchingPosts) <= POSTS_PER_PAGE * $argsFilter["art_page"]) {
+                    $showMoreButton = false;
+                }
+            }
+
+            if (empty($matchingPosts)): ?>
+                <div class="posts__container">
+                    <div class="no-posts">
+                        <p class="no-posts__paragraph">No posts founded</p>
+                    </div>
+                </div>
+            <?php else: 
+            for ($containerNum = 1; $containerNum <= GALLERY_COLUMN_COUNT; $containerNum++): ?>
+                <div class="posts__container">
+                    <?php
+                    for ($i = 0; $i < count($matchingPosts); $i++):
+                        if ($i % GALLERY_COLUMN_COUNT == $containerNum - 1): ?>
+
+                            <a class="post__image" href="<?php echo home_url() . "/art/" . get_post_field("post_name", $matchingPosts[$i]["postId"]); ?>">
+                                <img data-src="<?php echo $matchingPosts[$i]["image"]["url"]; ?>" alt="<?php echo $matchingPosts[$i]["image"]["title"]; ?>" class="lazy">
+                                <h3><?php echo $matchingPosts[$i]["title"]; ?></h3>
+                                <p>US$<?php echo $matchingPosts[$i]["price"]; ?></p>
+                            </a>
+
+                        <?php endif;
+                    endfor;
+                    ?>
+                </div>
+            <?php endfor; 
+            endif; ?>
     </section>
+
+    <button id="load-more" <?php if (empty($matchingPosts) || $showMoreButton) { echo 'style="display: none"'; } ?>>Load More</button>
+</div>
 
 <?php 
 get_footer();

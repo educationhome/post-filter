@@ -18,7 +18,7 @@
 
             if (empty($matchingPosts)): ?>
                 <div class="no-posts">
-                    <p class="no-posts__paragraph">No posts founded </p>
+                    <p class="no-posts__paragraph">No posts founded</p>
                 </div>
             <?php else:
                 for ($i = 1; $i <= GALLERY_COLUMN_COUNT; $i++) {
