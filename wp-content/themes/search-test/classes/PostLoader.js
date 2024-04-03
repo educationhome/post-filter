@@ -1,4 +1,14 @@
-import { debounce, setLazyLoading, POSTS_PER_PAGE, setHistory } from "../helper.js";
+import { 
+    debounce, 
+    setLazyLoading, 
+    POSTS_PER_PAGE, 
+    setHistory, 
+    isArrayEmpty, 
+    getActiveItems,
+    removeArrayParams,
+    clearSearchParams,
+    GALLERY_COLUMN_COUNT,
+} from "../helper.js";
 
 export default class PostLoader {
 
@@ -12,24 +22,37 @@ export default class PostLoader {
 
         this.currentPage = this.queryCurrentPage;
 
+        this.loadingGif = document.querySelector(".loading-gif");
+
         this.debounceLoadPosts = debounce(() => this.updateURL(), 800);
+        this.isPostsLoaded = false;
+
         this.addEvents();
     }
 
     addEvents() {
         this.page.querySelector("#query").addEventListener("input", this.debounceLoadPosts);
+        
         this.page.querySelectorAll(".filters__checkbox").forEach(element => {
             element.addEventListener("change", this.debounceLoadPosts);
         });
+
         this.page.querySelectorAll(".sizes__checkbox").forEach(element => {
             element.addEventListener("change", this.debounceLoadPosts);
         });
+
         this.page.querySelector("#lower").addEventListener("change", this.debounceLoadPosts);
         this.page.querySelector("#upper").addEventListener("change", this.debounceLoadPosts);
 
-        if (this.posts.querySelector("#load-more")) {
-            this.posts.querySelector("#load-more").addEventListener("click", this.loadPosts.bind(this)); 
+        if (this.posts.querySelector(".load-more")) {
+            this.posts.querySelector(".load-more").addEventListener("click", this.loadPosts.bind(this)); 
         }
+
+        if (this.posts.querySelector("#clear-all-filters")) {
+            this.posts.querySelector("#clear-all-filters").addEventListener("click", this.clearAllFilters.bind(this));
+        }
+        
+        window.addEventListener("popstate", this.updateFilters.bind(this));
     }
 
     loadPosts() {
@@ -37,8 +60,8 @@ export default class PostLoader {
         this.updateURL(true);
     }
 
-    updateURL(loadMore = false) {
-        if (!loadMore) {
+    async updateURL(loadMore = false, refreshPage = false) {
+        if (!loadMore && !refreshPage) {
             this.currentPage = 1;
         }
         
@@ -46,75 +69,147 @@ export default class PostLoader {
         const selectElement = this.page.querySelectorAll(".sizes__checkbox");
         const query = this.page.querySelector("#query");
         const searchQuery = query.value;
-        const filtersArray = this.getActiveItems(filters);
-        const select = this.getActiveItems(selectElement);
+        const filtersArray = getActiveItems(filters);
+        const select = getActiveItems(selectElement);
         const minPrice = this.getPrice("lower");
         const maxPrice = this.getPrice("upper");
         
-        window.history.replaceState({}, "", this.queryUrl(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, true));
+        if (!refreshPage) {
+            window.history.pushState({path: this.queryUrl(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, true).toString()}, "", this.queryUrl(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, true));
+            window.history.replaceState({path: this.queryUrl(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, true).toString()}, "", this.queryUrl(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, true).toString());
+        }
 
-        let filterResponse;
+        try {
+            this.showLoadingProcess();
 
-        if (!loadMore) {
-            this.sendDataToServer(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, loadMore)
-                .then(data => {
-                    filterResponse = data;
-                    return this.hidePosts();
-                })
-                .then(() => {
-                    this.changeGalleryContent((filterResponse == null || this.isArrayEmpty(filterResponse)) ? 1 : 0, filterResponse);
-                    setHistory();
+            if (!refreshPage) {
+                console.log("!refreshPage");
+                const filterResponse = await this.sendDataToServer(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, loadMore);
+                const sortedResponse = this.sortResponse(loadMore, filterResponse);
 
-                    if (!(filterResponse == null || this.isArrayEmpty(filterResponse))) {
-                        if (!this.hasMoreElements(filterResponse)) {
-                            document.getElementById("load-more").style.display = "none";
-                        } else {
-                            document.getElementById("load-more").style.display = "block";
-                        }
+                if (!loadMore) {
+                    await this.hidePosts();
+                    this.changeGalleryContent((filterResponse == null || isArrayEmpty(filterResponse)) ? 1 : 0, sortedResponse);
+                } else {
+                    this.addGalleryContent(sortedResponse);
+                }
+
+                this.updateLoadMoreButton(filterResponse);
+            } else {
+                if (this.currentPage == null) {
+                    this.currentPage = 1;
+                }
+
+                for (let i = 1; i <= this.currentPage; i++) {
+                    const filterResponse = await this.sendDataToServer(filtersArray, searchQuery, select, minPrice, maxPrice, i, loadMore);
+                    console.log(filterResponse);
+                    if (i == 1) {
+                        const sortedResponse = this.sortResponse(loadMore, filterResponse);
+                        this.changeGalleryContent((filterResponse == null || isArrayEmpty(filterResponse)) ? 1 : 0, sortedResponse);
+                    } else {
+                        const sortedResponse = this.sortResponse(!loadMore, filterResponse);
+                        this.addGalleryContent(sortedResponse);
                     }
-                    
-                    this.showPosts();
-                    setLazyLoading();
-                })
-                .catch(error => {
-                    console.error("Error outside the function:", error);
-                    throw error;
-                });
-        } else {
-            this.sendDataToServer(filtersArray, searchQuery, select, minPrice, maxPrice, this.currentPage, loadMore)
-                .then(data => {
-                    this.addGalleryContent(data); 
-                    setHistory();
-                    if (!(data == null || this.isArrayEmpty(data))) {
-                        if (!this.hasMoreElements(data)) {
-                            document.getElementById("load-more").style.display = "none";
-                        } else {
-                            document.getElementById("load-more").style.display = "block";
-                        }
-                    }   
-                    setLazyLoading();
-                })
-                .catch(error => {
-                    console.error("Error outside the function:", error);
-                    throw error;
-                });
+
+                    this.updateLoadMoreButton(filterResponse);
+                }   
+            }
+
+            setHistory();
+
+            if (!loadMore) {
+                this.showPosts();
+            }
+
+            setLazyLoading();
+            this.hideLoadingProcess();
+        } 
+        catch (error) {
+            console.error("Error:", error);
+            throw error;
         }
     }
 
-    hasMoreElements(data) {
-        let sum = 0;
-        data.forEach(subArray => {
-            subArray.forEach(el => {
-                sum++;
-            });
+
+
+    updateLoadMoreButton(filterResponse) {
+        if (!(isArrayEmpty(filterResponse))) {
+            if (!this.hasMoreElements(filterResponse)) {
+                this.hideLoadMoreButton();
+            } else {
+                this.showLoadMoreButton();
+            }
+        }
+    }
+
+
+
+    updateFilters() {
+        const params = new URLSearchParams(window.location.search);
+
+        document.getElementById("query").value = params.get("query") || "";
+    
+        const filterCheckboxes = document.querySelectorAll(".filters__checkbox");
+        filterCheckboxes.forEach(checkbox => {
+            checkbox.checked = params.getAll(checkbox.name).includes(checkbox.value);
         });
 
-        if (sum < POSTS_PER_PAGE) {
-            return false;
+        const sizesCheckboxes = document.querySelectorAll(".sizes__checkbox");
+        sizesCheckboxes.forEach(checkbox => {
+            checkbox.checked = params.getAll(checkbox.name).includes(checkbox.value);
+        });
+    
+        const minPrice = params.get("min_price");
+        const maxPrice = params.get("max_price");
+
+        if (minPrice) {
+            document.querySelector("#lower").value = minPrice;
+            document.querySelector("#min-value").textContent = minPrice;
+        }
+        if (maxPrice) {
+            document.querySelector("#upper").value = maxPrice;
+            document.querySelector("#max-value").textContent = maxPrice;
         }
 
-        return true;
+        this.currentPage = params.get("art_page");
+
+        this.updateURL(false, true);
     }
+
+
+
+    sortResponse(loadMore, data = []) {
+        let response = [];
+
+        for (let i = 0; i < GALLERY_COLUMN_COUNT; i++) {
+            response[i] = [];
+        }
+
+        if (!loadMore) {
+            data.forEach((post, index) => {
+                const bucketIndex = index % GALLERY_COLUMN_COUNT;
+                response[bucketIndex].push(post);
+            });
+            return response;
+        } else {
+            let postImagesCount = document.querySelectorAll(".post__image").length;
+            
+            data.forEach((post) => {
+                const bucketIndex = postImagesCount % GALLERY_COLUMN_COUNT;
+                response[bucketIndex].push(post);
+                postImagesCount++;
+            });
+            return response;
+        }
+    }
+
+
+
+    hasMoreElements(data) {
+        return data.flat().length >= POSTS_PER_PAGE;
+    }
+
+
 
     addGalleryContent(data = []) {
         const containers = document.querySelectorAll(".posts__container");
@@ -150,76 +245,66 @@ export default class PostLoader {
         });
     }
 
+
+
     changeGalleryContent(emptyArray = 0, data = []) {
         const container = document.querySelector(".posts__gallery");
         container.innerHTML = "";
 
-        if (!emptyArray) {
-            data.forEach((group) => {
+        if (!emptyArray && data.length > 0) {
+            data.forEach(group => {
                 const groupContainer = document.createElement("div");
                 groupContainer.classList.add("posts__container");
-                
+
                 group.forEach(post => {
-                    const titleElement = document.createElement("h3");
-                    titleElement.textContent = post.title;
-            
-                    const imageElement = document.createElement("img");
-                    imageElement.setAttribute("data-src", post.image_url);
-                    imageElement.classList.add("lazy");
-            
-                    const priceParagraph = document.createElement("p");
-                    priceParagraph.textContent = `US$${post.price}`;
-            
                     const postContainer = document.createElement("a");
                     postContainer.classList.add("post__image");
-                    postContainer.setAttribute("href", window.location.origin + "/art/" + post.slug);
-            
-                    postContainer.appendChild(imageElement);
-                    postContainer.appendChild(titleElement);
-                    postContainer.appendChild(priceParagraph);
+                    postContainer.setAttribute("href", `/art/${post.slug}`);
+    
+                    postContainer.innerHTML = `
+                        <img class="lazy" data-src="${post.image_url}">
+                        <h3>${post.title}</h3>
+                        <p>US$${post.price}</p>
+                    `;
+    
                     groupContainer.appendChild(postContainer);
                 });
-            
+    
                 container.appendChild(groupContainer);
             });
+            this.showLoadMoreButton();
         } else {
             const groupContainer = document.createElement("div");
             groupContainer.classList.add("posts__container");
-
-            const noPostsDiv = document.createElement("div");
-            noPostsDiv.classList.add("no-posts");
-
-            const noPostsParagraph = document.createElement("p");
-            noPostsParagraph.classList.add("no-posts__paragraph");
-            noPostsParagraph.textContent = "No posts founded";
-
-            noPostsDiv.appendChild(noPostsParagraph);
-            groupContainer.appendChild(noPostsDiv);
-
+    
+            groupContainer.innerHTML = `
+                <div class="no-posts">
+                    <p class="no-posts__paragraph">
+                        No posts founded
+                    </p>
+                    <button id="clear-all-filters">
+                        Clear All Filters
+                    </button>
+                </div>
+            `;
+    
+            this.hideLoadMoreButton();
             container.appendChild(groupContainer);
+
+            document.querySelector("#clear-all-filters").addEventListener("click", this.clearAllFilters.bind(this));
         }
     }
+
+
 
     queryUrl(filters = [], query = "", select = [], minPrice = 0, maxPrice = 0, page = 1, override = false) {
         const currentURL = new URL(window.location.href);
         const params = currentURL.searchParams;
 
         if (override) {
-            Array.from(currentURL.searchParams.entries()).forEach(([key, value], index) => {
-                params.delete(`filters[${index}]`);
-            });
-
-            params.delete("filters[]");
-            params.delete("query");
-
-            Array.from(currentURL.searchParams.entries()).forEach(([key, value], index) => {
-                params.delete(`sizes[${index}]`);
-            });
-
-            params.delete("sizes[]");
-            params.delete("min_price");
-            params.delete("max_price");
-            params.delete("art_page");
+            removeArrayParams(params, currentURL, "filters");
+            removeArrayParams(params, currentURL, "sizes");
+            clearSearchParams(params, "filters[]", "query", "sizes[]", "min_price", "max_price", "art_page");
         }
 
         filters.forEach((filter) => {
@@ -230,45 +315,30 @@ export default class PostLoader {
             params.append("sizes[]", size);
         });
     
-        if (query.length === 0) {
-            params.delete("query");
-        } else {
-            params.set("query", query);
-        }
-    
-        if (minPrice == 0) {
-            params.delete("min_price");
-        } else {
-            params.set("min_price", minPrice);
-        }
+        if (query.length === 0) params.delete("query");
+        else params.set("query", query);
 
-        if (maxPrice == 0) {
-            params.delete("max_price");
-        } else {
-            params.set("max_price", maxPrice);
-        }
-    
-        if (page === 1) {
-            params.delete("art_page");
-        } else {
-            params.set("art_page", page);
-        }
+        if (minPrice === 0) params.delete("min_price");
+        else params.set("min_price", minPrice);
+
+        if (maxPrice === 0) params.delete("max_price");
+        else params.set("max_price", maxPrice);
+
+        if (page === 1) params.delete("art_page");
+        else params.set("art_page", page);
     
         currentURL.search = params.toString();
 
-        return currentURL.toString();
+        return currentURL;
     }
+
+
 
     sendDataToServer(filtersArray, searchQuery, select, minPrice, maxPrice, currentPage, loadMore = false) {
         const formData = new FormData();
         const ADMIN_AJAX_URL = window.location.origin + "/wp-admin/admin-ajax.php";
     
-        if (!loadMore) {
-            formData.append("action", "filter_ajax"); 
-        } else {
-            formData.append("action", "add_posts_ajax"); 
-        }
-        
+        formData.append("action", "add_posts_ajax");
         formData.append("filtersArray", JSON.stringify(filtersArray));
         formData.append("searchQuery", searchQuery);
         formData.append("select", JSON.stringify(select));
@@ -287,10 +357,8 @@ export default class PostLoader {
         });
     }
 
-    isArrayEmpty(array) {
-        return array.every(subArray => Array.isArray(subArray) && subArray.length === 0);
-    }
 
+    
     animatePostElement(postElement, animationIndex) {
         gsap.fromTo(postElement, 
             { opacity: 0, y: -50 },
@@ -302,80 +370,120 @@ export default class PostLoader {
             }
         );
     }
+
+
+
+    showLoadingProcess() {
+        this.loadingGif.style.display = "flex";
+        document.querySelector(".posts__gallery").style.opacity = 0.3;
+    }
+
+
+
+    hideLoadingProcess() {
+        this.loadingGif.style.display = "none";
+        document.querySelector(".posts__gallery").style.opacity = 1;
+    }
+
+
+
+    showLoadMoreButton() {
+        document.querySelector(".load-more").classList.remove("--is-invisible");
+    }
+
+
+    
+    hideLoadMoreButton() {
+        document.querySelector(".load-more").classList.add("--is-invisible");
+    }
+
+
     
     hidePosts() {
         return new Promise(resolve => {
+            this.loadingGif.style.display = "flex";
             const posts = document.querySelectorAll(".posts__container");
-            let completedAnimations = 0;
     
             if(posts.length === 0) resolve();
-    
-            posts.forEach((post, index) => {
-                gsap.to(post, {
-                    opacity: 0,
+
+            gsap.to(posts,  {
+                opacity: 0,
                     y: -50,
-                    delay: index * 0.2, 
-                    duration: 0.3, 
+                    stagger: 0.2, 
+                    duration: 0.3,
                     onComplete: () => {
-                        completedAnimations++;
-                        if (completedAnimations === posts.length) {
-                            const postContainer = document.querySelector(".posts__gallery");
-                            postContainer.style.display = "none";
-                            resolve(); 
-                        }
-                    },
-                });
-            });
+                        const postContainer = document.querySelector(".posts__gallery");
+                        postContainer.style.display = "none";
+                        resolve();
+                }
+            }) 
         });
     }
+
+
 
     showPosts() {
         const postContainer = document.querySelector(".posts__gallery");
         postContainer.style.display = "flex";
-
+    
         const posts = document.querySelectorAll(".posts__container");
-
-        let startedAnimations = 0;
-
-        posts.forEach((post, index) => {
-           
-            gsap.fromTo(post, 
-                { opacity: 0, y: -50 },
-                {
-                    opacity: 1, 
-                    y: 0, 
-                    delay: index * 0.2,
-                    duration: 0.3,
-                    onStart: function() {
-                        startedAnimations++;
-                    },
-                    onComplete: function() {
-                        if (startedAnimations === posts.length) {
-                           
-                        }
-                    },
-                }
-            );
+    
+        gsap.fromTo(posts, {
+            opacity: 0,
+            y: -50
+        }, {
+            opacity: 1,
+            y: 0,
+            stagger: 0.2,
+            duration: 0.3
         });
     }
 
-    getPrice(name = "") {
-        const input = document.getElementById(`${name}`);
 
+
+    getPrice(name = "") {
+        const input = document.getElementById(name);
         return input.value;
     }
 
-    getActiveItems(element) {
-        let array = [];
-    
-        element.forEach(item => {
-            if (item.checked && item.value) {
-                array.push(item.value);
-            }
+
+
+    clearAllFilters() {
+        const textInputs =  this.page.querySelectorAll(".search input[type='text']");
+        textInputs.forEach(input => {
+            input.value = "";
         });
+
+        const checkboxes =  this.page.querySelectorAll(".filters input[type='checkbox'], .sizes input[type='checkbox']");
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+
+        const lowerSlider = this.page.querySelector("#lower");
+        const upperSlider = this.page.querySelector("#upper");
+        const minValue = this.page.querySelector(".range-values #min-value");
+        const maxValue = this.page.querySelector(".range-values #max-value");
+        const formData = new FormData();
+        const ADMIN_AJAX_URL = window.location.origin + "/wp-admin/admin-ajax.php";
     
-        return array;
+        formData.append("action", "get_highest_price");
+    
+        fetch(ADMIN_AJAX_URL, {
+            method: "POST",
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            const maxPrice = data;
+            lowerSlider.value = 0;
+            upperSlider.value = maxPrice;
+            minValue.textContent = 0;
+            maxValue.textContent = maxPrice;
+        });
+
+        this.debounceLoadPosts();
     }
+
 
 
     // Helper 
@@ -385,6 +493,8 @@ export default class PostLoader {
 
         return url.searchParams.get("art_page") ?? 1;
     }
+
+
     
     get currentUrlObject() {
         return new URL(window.location.href);

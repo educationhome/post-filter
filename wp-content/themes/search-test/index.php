@@ -69,7 +69,6 @@ if (isset($argsFilter["min_price"]) && isset($argsFilter["max_price"])) {
 }
 
 $queryPosts = new WP_Query($argsPosts);
-
 ?>
 
 <h1>Search Test</h1>
@@ -137,7 +136,9 @@ $queryPosts = new WP_Query($argsPosts);
         </div>
 
         <div class="price">
-            <label for="price" class="price__label">Price</label>
+            <label for="price" class="price__label">
+                Price
+            </label>
             <div class="prices">
                 <div class="range-values">
                     <p>
@@ -171,6 +172,7 @@ $queryPosts = new WP_Query($argsPosts);
                 </span>
             </div>
         </div>
+
     </form>
 </div>
 
@@ -178,60 +180,55 @@ $queryPosts = new WP_Query($argsPosts);
     <h1>Result</h1>
 
     <section class="posts__gallery">
-            <?php
-            while($queryPosts->have_posts()): $queryPosts->the_post(); 
-                $postId = get_the_ID();
-                $title = get_the_title($postId);
-                $image = get_field("art_image", $postId);
-                $size = get_field("art_size", $postId);
-                $price = intval(get_field("art_price", $postId));
-                    
-                $matchingPosts[] = array(
-                    "postId" => $postId,
-                    "title" => $title,
-                    "image" => $image,
-                    "size" => $size,
-                    "price" => $price,
-                );
-            endwhile;
+        <?php
+        $matchingPosts = fetchMatchingPosts($queryPosts);
+        $showMoreButton = !empty($matchingPosts) && count($matchingPosts) >= POSTS_PER_PAGE * $argsFilter["art_page"];
+        ?>
 
-            $showMoreButton = true;
-            if (empty($matchingPosts)) {
-                $showMoreButton = false;
-            } else {
-                if (count($matchingPosts) <= POSTS_PER_PAGE * $argsFilter["art_page"]) {
-                    $showMoreButton = false;
-                }
-            }
-
-            if (empty($matchingPosts)): ?>
-                <div class="posts__container">
-                    <div class="no-posts">
-                        <p class="no-posts__paragraph">No posts founded</p>
-                    </div>
+        <?php if (empty($matchingPosts)): ?>
+            <div class="posts__container">
+                <div class="no-posts">
+                    <p class="no-posts__paragraph">
+                        No posts founded
+                    </p>
+                    <button id="clear-all-filters">
+                        Clear All Filters
+                    </button>
                 </div>
-            <?php else: 
+            </div>
+
+        <?php else: 
             for ($containerNum = 1; $containerNum <= GALLERY_COLUMN_COUNT; $containerNum++): ?>
+
                 <div class="posts__container">
-                    <?php
-                    for ($i = 0; $i < count($matchingPosts); $i++):
+                    <?php for ($i = 0; $i < count($matchingPosts); $i++):
                         if ($i % GALLERY_COLUMN_COUNT == $containerNum - 1): ?>
 
                             <a class="post__image" href="<?php echo home_url() . "/art/" . get_post_field("post_name", $matchingPosts[$i]["postId"]); ?>">
-                                <img data-src="<?php echo $matchingPosts[$i]["image"]["url"]; ?>" alt="<?php echo $matchingPosts[$i]["image"]["title"]; ?>" class="lazy">
-                                <h3><?php echo $matchingPosts[$i]["title"]; ?></h3>
-                                <p>US$<?php echo $matchingPosts[$i]["price"]; ?></p>
+                                <img 
+                                    data-src="<?php echo $matchingPosts[$i]["image"]["url"]; ?>" 
+                                    alt="<?php echo $matchingPosts[$i]["image"]["title"]; ?>" 
+                                    class="lazy"
+                                >
+                                <h3>
+                                    <?php echo $matchingPosts[$i]["title"]; ?>
+                                </h3>
+                                <p>
+                                    US$<?php echo $matchingPosts[$i]["price"]; ?>
+                                </p>
                             </a>
 
                         <?php endif;
-                    endfor;
-                    ?>
+                    endfor; ?>
                 </div>
-            <?php endfor; 
-            endif; ?>
-    </section>
+            <?php endfor;
+        endif; ?>
 
-    <button id="load-more" <?php if (empty($matchingPosts) || $showMoreButton) { echo 'style="display: none"'; } ?>>Load More</button>
+    </section>
+    
+    <button class="load-more <?php if (empty($matchingPosts) || (!$showMoreButton)) { echo "--is-invisible"; } ?>" >
+        Load More
+    </button>
 </div>
 
 <?php 

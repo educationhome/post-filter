@@ -53,8 +53,6 @@ export default class PriceRangeUpdater {
     updateValues() {
         this.minValueSpan.textContent = this.lowerInput.value;
         this.maxValueSpan.textContent = this.upperInput.value;
-
-        // this.debounceLoadPosts();
     }
 }
 
